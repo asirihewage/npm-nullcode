@@ -1,0 +1,13 @@
+tests/
+scripts/
+src/
+coverage/
+*.tsbuildinfo
+.eslintcache
+.npm-cleanup/
+.npm-cleanup-cache/
+vitest.config.ts
+eslint.config.mjs
+tsconfig.json
+tsconfig.build.json
+.prettierrc.json

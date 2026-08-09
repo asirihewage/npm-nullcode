@@ -1,0 +1,58 @@
+{
+  "name": "npm-cleanup",
+  "version": "0.1.0",
+  "description": "Find what you can safely remove from your JavaScript/TypeScript project.",
+  "keywords": [
+    "cleanup",
+    "unused",
+    "dependencies",
+    "dead-code",
+    "maintenance",
+    "analysis",
+    "confidence"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "bin": {
+    "npm-cleanup": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests scripts --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fixtures": "node scripts/generate-fixtures.mjs",
+    "cleanup": "node dist/cli/index.js",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^3.0.0"
+  }
+}
