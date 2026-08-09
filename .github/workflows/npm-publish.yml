@@ -1,9 +1,13 @@
-# Publishes nullcode to npm when a Release is created.
+# Publishes nullcode to npm and GitHub Packages when a Release is created.
 #
 # Required repository secret:
 #   NPM_TOKEN — an npm access token (granular token scoped to the nullcode
 #   package with Read+Write, and "Bypass 2FA" enabled, since the account
 #   requires two-factor authentication).
+#
+# GitHub Packages publishing uses the built-in GITHUB_TOKEN (no secret needed).
+# On GitHub Packages the package is published as @asirihewage/nullcode, since
+# that registry only supports scoped package names.
 #
 # See: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
 
@@ -35,6 +39,25 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
       - run: npm ci
-      - run: npm publish
+      - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-github-packages:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com/
+      - run: npm ci
+      - name: Scope package name for GitHub Packages
+        run: npm pkg set name=@${GITHUB_REPOSITORY_OWNER}/nullcode
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

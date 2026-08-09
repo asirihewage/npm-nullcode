@@ -1,6 +1,6 @@
 {
   "name": "nullcode",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Find what you can safely remove from your JavaScript/TypeScript project — with local AI verification via Ollama.",
   "keywords": [
     "cleanup",
@@ -14,6 +14,10 @@
     "ai"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asirihewage/npm-nullcode.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=18.17"
