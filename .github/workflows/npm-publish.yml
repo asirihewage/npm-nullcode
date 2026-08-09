@@ -39,6 +39,8 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
       - run: npm ci
+      - name: Use npmjs registry (package.json publishConfig points at GitHub Packages)
+        run: npm pkg delete publishConfig.registry
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
