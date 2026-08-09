@@ -18,7 +18,7 @@ export interface LoadedConfig {
   configPath?: string;
 }
 
-const CONFIG_FILE = ".npm-cleanupignore";
+const CONFIG_FILE = ".nullcodeignore";
 
 export function findNearestPackageJson(start: string): string | null {
   let dir = path.resolve(start);
@@ -57,7 +57,7 @@ export function loadUserConfig(root: string): LoadedConfig {
   const pkgPath = path.join(root, "package.json");
   if (fs.existsSync(pkgPath)) {
     const pkg = readPackageJson(pkgPath);
-    const section = pkg?.["npmCleanup"];
+    const section = pkg?.["nullcode"];
     if (section && typeof section === "object") {
       const s = section as Record<string, unknown>;
       userConfig = {
@@ -100,11 +100,13 @@ export function mergeConfig(root: string, cli: EffectiveOptions): {
   verbose: boolean;
   noColor: boolean;
   userConfig: UserConfig;
+  ignore?: string[];
 } {
   const loaded = loadUserConfig(root);
   const ignoreLines = [...loaded.ignoreLines, ...(cli.ignore ?? [])];
   return {
     matcher: createIgnoreMatcher(ignoreLines),
+    ignore: ignoreLines,
     threshold: cli.threshold ?? loaded.userConfig.threshold ?? 90,
     framework: cli.framework ?? loaded.userConfig.framework ?? "auto",
     ai: cli.ai ?? loaded.userConfig.ai ?? true,

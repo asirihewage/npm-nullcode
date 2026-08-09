@@ -1,4 +1,6 @@
-import { createColors, type Colors } from "picocolors";
+import { createColors } from "picocolors";
+
+type Colors = ReturnType<typeof createColors>;
 
 let colors: Colors = createColors(true);
 

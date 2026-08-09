@@ -32,14 +32,21 @@ export function computeDependencyUsage(
     for (const ref of summary.imports) {
       const node = ctx.graph.files.get(fileAbs);
       const resolved = node?.imports.get(ref.specifier);
-      if (resolved?.kind !== "package" || resolved.packageName !== pkgName) continue;
+      // Workspace-resolved imports come back as kind "file" with packageName.
+      const isUsage =
+        (resolved?.kind === "package" || (resolved?.kind === "file" && resolved.packageName)) &&
+        resolved.packageName === pkgName;
+      if (!isUsage) continue;
       if (ref.kind === "require") usage.requireFiles.push(fileAbs);
       else if (ref.kind === "dynamic") usage.dynamicFiles.push(fileAbs);
       else usage.importFiles.push(fileAbs);
     }
     for (const spec of summary.reexports) {
       const resolved = ctx.resolver.resolve(spec, fileAbs);
-      if (resolved?.kind === "package" && resolved.packageName === pkgName) {
+      if (
+        (resolved?.kind === "package" || (resolved?.kind === "file" && resolved.packageName)) &&
+        resolved.packageName === pkgName
+      ) {
         usage.importFiles.push(fileAbs);
       }
     }

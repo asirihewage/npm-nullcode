@@ -11,7 +11,7 @@ const SECRET_VALUE_PATTERNS = [
 
 /**
  * Redacts secret-looking tokens from arbitrary text before it is sent to an
- * LLM or written to a report. Defense in depth: npm-cleanup never includes
+ * LLM or written to a report. Defense in depth: nullcode never includes
  * `.env` values in LLM payloads, but this guarantees nothing leaks.
  */
 export function redactSecrets(text: string): string {

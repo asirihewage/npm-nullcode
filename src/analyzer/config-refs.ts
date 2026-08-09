@@ -1,7 +1,6 @@
 import * as path from "node:path";
 import ts from "typescript";
-import type { AstSummary } from "../types/index.js";
-import { analyzeAst, analyzeRegexFallback } from "./ast/index.js";
+import { analyzeAst } from "./ast/index.js";
 import type { IndexedFile } from "../types/index.js";
 import { CONFIG_TOOL } from "./file-indexer.js";
 
@@ -43,6 +42,7 @@ export function analyzeConfigFiles(
   files: IndexedFile[],
   texts: Map<string, string>,
   pkgNames: Set<string>,
+  root: string,
 ): ConfigAnalysis {
   const pkgUsage = new Map<string, Set<string>>();
   const fileUsage = new Map<string, Set<string>>();
@@ -76,6 +76,9 @@ export function analyzeConfigFiles(
     ) {
       continue;
     }
+    // package.json lists dependencies — scanning it would register every
+    // declared dependency as "referenced by config" (a self-reference).
+    if (path.basename(file.rel) === "package.json") continue;
     const text = texts.get(file.abs) ?? "";
     if (text.length === 0) continue;
 
@@ -100,9 +103,13 @@ export function analyzeConfigFiles(
     for (const s of strings) {
       const clean = s.trim();
       if (!clean) continue;
-      if (clean.startsWith("./") || clean.startsWith("../")) {
+      if (clean.startsWith("./") || clean.startsWith("../") || clean.startsWith("/")) {
         // file path reference (css import, html src, tailwind content, ...)
-        const abs = path.resolve(path.dirname(file.abs), clean.replace(/\?.*$/, ""));
+        // "/"-prefixed paths are root-relative (html <script src>); "./" are
+        // relative to the config file.
+        const abs = clean.startsWith("/")
+          ? path.join(root, clean.replace(/\?.*$/, ""))
+          : path.resolve(path.dirname(file.abs), clean.replace(/\?.*$/, ""));
         const plain = abs.replace(/\.[a-z]+$/i, "");
         for (const candidate of allAbs) {
           const cplain = candidate.replace(/\.[a-z]+$/i, "");

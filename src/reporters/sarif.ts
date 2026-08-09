@@ -18,7 +18,7 @@ export function renderSarifReport(result: ScanResult, rootDir: string): object {
   const results: SarifResult[] = [];
 
   for (const c of result.candidates) {
-    const ruleId = `npm-cleanup/${c.type}`;
+    const ruleId = `nullcode/${c.type}`;
     if (!rules.has(ruleId)) {
       rules.set(ruleId, {
         id: ruleId,
@@ -70,9 +70,9 @@ export function renderSarifReport(result: ScanResult, rootDir: string): object {
       {
         tool: {
           driver: {
-            name: "npm-cleanup",
+            name: "nullcode",
             semanticVersion: result.version,
-            informationUri: "https://github.com/anomalyco/npm-cleanup",
+            informationUri: "https://github.com/anomalyco/nullcode",
             rules: [...rules.values()],
           },
         },

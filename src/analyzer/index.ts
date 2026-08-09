@@ -16,7 +16,7 @@ import type {
 import { analyzeAst, analyzeRegexFallback } from "./ast/index.js";
 import { type FileIndex, indexFiles, CONFIG_TOOL } from "./file-indexer.js";
 import { buildImportGraph, type ImportGraph } from "./graph.js";
-import { createResolverContext, type ResolverContext } from "./resolver.js";
+import { createResolverContext, discoverAliasMaps, type ResolverContext } from "./resolver.js";
 import { analyzeConfigFiles, type ConfigAnalysis, isLegacyConfig } from "./config-refs.js";
 import {
   analyzeScripts,
@@ -29,8 +29,8 @@ import { detectGit, type GitInfo } from "./git.js";
 import { classifyTests } from "./tests.js";
 import { parseCiEnv, parseDockerEnv, parseEnvFile, scanScriptEnv } from "./env.js";
 import { allAdapters, detectFramework } from "../frameworks/registry.js";
-import { readPackageJson, mergeIgnoreLines, type LoadedConfig } from "../config/load.js";
-import { createIgnoreMatcher } from "../utils/ignore.js";
+import { readPackageJson, type LoadedConfig } from "../config/load.js";
+import { createIgnoreMatcher, mergeIgnoreLines } from "../utils/ignore.js";
 import { shortHash } from "../utils/hash.js";
 import { fileExists } from "../utils/fs.js";
 
@@ -89,7 +89,7 @@ export async function analyzeProject(opts: AnalyzeOptions): Promise<AnalyzerCont
   report(opts.onProgress, "index", `${fileIndex.files.length} files indexed`);
 
   const cacheDir =
-    opts.enableCache === false ? null : path.join(root, ".npm-cleanup-cache");
+    opts.enableCache === false ? null : path.join(root, ".nullcode-cache");
 
   // 1. Parse all source files (with cache when enabled).
   const ast = new Map<string, AstSummary>();
@@ -171,7 +171,7 @@ export async function analyzeProject(opts: AnalyzeOptions): Promise<AnalyzerCont
   }
 
   // 3. Aliases from bundler configs (tsconfig handled lazily in resolver).
-  const aliasMaps: AliasMap[] = discoverBundleAliases(fileIndex.files, root);
+  const aliasMaps: AliasMap[] = discoverAliasMaps(root, fileIndex.files.map((f) => f.rel));
 
   // 4. Framework detection.
   const fwCtx: FrameworkContext = {
@@ -251,7 +251,7 @@ export async function analyzeProject(opts: AnalyzeOptions): Promise<AnalyzerCont
     const legacy = isLegacyConfig(f, allConfigBasenames);
     configFiles.push({ abs: f.abs, rel: f.rel, tool, auto: true, legacy });
   }
-  const configAnalysis = analyzeConfigFiles(fileIndex.files, fileIndex.texts, pkgNames);
+  const configAnalysis = analyzeConfigFiles(fileIndex.files, fileIndex.texts, pkgNames, root);
 
   // 6. Import graph.
   const resolver = createResolverContext(root, aliasMaps, workspaceNames);
@@ -358,7 +358,7 @@ function loadProjectIgnore(
 
 function readIgnoreFile(root: string): LoadedConfig {
   const lines: string[] = [];
-  const file = path.join(root, ".npm-cleanupignore");
+  const file = path.join(root, ".nullcodeignore");
   try {
     if (fs.existsSync(file)) {
       const content = fs.readFileSync(file, "utf8");
@@ -368,46 +368,6 @@ function readIgnoreFile(root: string): LoadedConfig {
     // ignore unreadable files
   }
   return { ignoreLines: lines, matcher: createIgnoreMatcher(lines), userConfig: {} };
-}
-
-function discoverBundleAliases(files: IndexedFile[], root: string): AliasMap[] {
-  const out: AliasMap[] = [];
-  void root;
-  for (const f of files) {
-    const base = f.rel.split("/").at(-1) ?? f.rel;
-    if (base === "tsconfig.json" || base === "jsconfig.json") continue;
-    if (
-      f.kind === "config" &&
-      /^((vite|vitest|webpack|nuxt|svelte)\.config\.(js|cjs|mjs|ts|mts|cts))$/.test(base)
-    ) {
-      out.push(...aliasesFromConfigFile(f.abs));
-    }
-  }
-  return out;
-}
-
-function aliasesFromConfigFile(abs: string): AliasMap[] {
-  const aliases: AliasMap[] = [];
-  let text = "";
-  try {
-    text = fs.readFileSync(abs, "utf8");
-  } catch {
-    return aliases;
-  }
-  const blockRe = /alias\s*:\s*\{([\s\S]*?)\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = blockRe.exec(text)) !== null) {
-    const body = m[1] ?? "";
-    const pairRe = /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g;
-    let p: RegExpExecArray | null;
-    while ((p = pairRe.exec(body)) !== null) {
-      const from = p[1]!;
-      let to = p[2]!;
-      if (to.startsWith(".")) to = path.resolve(path.dirname(abs), to);
-      aliases.push({ from, to, hasStar: from.includes("*") });
-    }
-  }
-  return aliases;
 }
 
 /* ------------------------------------------------------------------ */

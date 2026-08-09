@@ -26,7 +26,7 @@ export interface CleanupPlan {
   skipped: PlanItem[];
 }
 
-const STATE_DIR = ".npm-cleanup";
+const STATE_DIR = ".nullcode";
 
 function planItemsFor(candidates: Candidate[], threshold: number): {
   remove: PlanItem[];
@@ -75,7 +75,7 @@ export function buildCleanupPlan(
 ): CleanupPlan {
   const { remove, sketchy } = planItemsFor(result.candidates, opts.threshold);
   return {
-    tool: "npm-cleanup",
+    tool: "nullcode",
     version: result.version,
     createdAt: new Date().toISOString(),
     rootDir,

@@ -1,0 +1,9 @@
+name: ci
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+    steps:
+      - run: node src/app.js

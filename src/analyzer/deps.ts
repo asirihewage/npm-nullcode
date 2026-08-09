@@ -60,7 +60,7 @@ export function tokenizeScript(script: string): string[] {
   let current = "";
   let quote: string | null = null;
   for (let i = 0; i < script.length; i++) {
-    const ch = script[i];
+    const ch = script[i]!;
     if (quote) {
       if (ch === quote) quote = null;
       else current += ch;
@@ -88,13 +88,53 @@ export function extractPathTokens(script: string, root: string): string[] {
   const paths: string[] = [];
   for (const token of tokens) {
     const clean = token.replace(/^["']|["']$/g, "");
-    if (clean.startsWith("./") || clean.startsWith("../") || clean.startsWith("/") || clean.startsWith("scripts/") || clean.startsWith("bin/")) {
-      const abs = path.resolve(root, clean);
+    if (clean.startsWith("./") || clean.startsWith("../") || clean.startsWith("/") || clean.startsWith("src/") || clean.startsWith("scripts/") || clean.startsWith("bin/")) {
+      let abs = path.resolve(root, clean);
+      if (!fileExists(abs)) {
+        // `node src/app.ts` resolves from the workspace root
+        abs = path.resolve(root, clean.replace(/^\.\//, ""));
+      }
       if (fileExists(abs)) paths.push(abs);
     }
   }
   return paths;
 }
+
+/**
+ * Well-known bin names per package, used when node_modules is not installed
+ * (fallback so script-based usage detection still works for common tools).
+ */
+const KNOWN_BIN_FALLBACK: Record<string, string[]> = {
+  typescript: ["tsc", "tsserver"],
+  vite: ["vite"],
+  vitest: ["vitest"],
+  webpack: ["webpack"],
+  "webpack-cli": ["webpack"],
+  jest: ["jest"],
+  eslint: ["eslint"],
+  prettier: ["prettier"],
+  esbuild: ["esbuild"],
+  rollup: ["rollup"],
+  next: ["next"],
+  "ts-node": ["ts-node", "ts-node-esm", "ts-node-cwd"],
+  nodemon: ["nodemon"],
+  concurrently: ["concurrently"],
+  rimraf: ["rimraf"],
+  "cross-env": ["cross-env"],
+  "@playwright/test": ["playwright"],
+  playwright: ["playwright"],
+  prisma: ["prisma"],
+  turbo: ["turbo"],
+  nx: ["nx"],
+  expo: ["expo"],
+  babel: ["babel", "babel-node"],
+  "@babel/cli": ["babel"],
+  tailwindcss: ["tailwindcss"],
+  postcss: ["postcss"],
+  sass: ["sass"],
+  stylelint: ["stylelint"],
+  "tsx": ["tsx"],
+};
 
 /**
  * Reads `bin` entries of installed packages (node_modules) to map binary
@@ -117,7 +157,7 @@ export function buildBinMap(
       else if (json.bin && typeof json.bin === "object") bins = Object.keys(json.bin);
     } catch {
       // node_modules not installed (or package not installed)
-      bins = [name.split("/").at(-1) ?? name];
+      bins = KNOWN_BIN_FALLBACK[name] ?? [name.split("/").at(-1) ?? name];
     }
     if (bins.length === 0) bins = [name.split("/").at(-1) ?? name];
     for (const bin of bins) {

@@ -1,3 +1,5 @@
+import { detectOllama } from "./ollama.js";
+
 export interface LLMProvider {
   name: string;
   model: string;
@@ -60,7 +62,7 @@ export function resolveProvider(): LLMProvider | null {
   const deepseekKey = process.env["DEEPSEEK_API_KEY"];
   if (deepseekKey && deepseekKey.trim().length > 0) {
     const base = process.env["DEEPSEEK_BASE_URL"] ?? "https://api.deepseek.com";
-    const model = process.env["NPM_CLEANUP_MODEL"] ?? "deepseek-chat";
+    const model = process.env["NULLCODE_MODEL"] ?? "deepseek-chat";
     return {
       name: "deepseek",
       model,
@@ -86,7 +88,7 @@ export function resolveProvider(): LLMProvider | null {
   const openaiKey = process.env["OPENAI_API_KEY"];
   if (openaiKey && openaiKey.trim().length > 0) {
     const base = process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com/v1";
-    const model = process.env["NPM_CLEANUP_MODEL"] ?? "gpt-4o-mini";
+    const model = process.env["NULLCODE_MODEL"] ?? "gpt-4o-mini";
     return {
       name: "openai",
       model,
@@ -109,9 +111,9 @@ export function resolveProvider(): LLMProvider | null {
     };
   }
 
-  if (process.env["NPM_CLEANUP_LLM"] === "ollama") {
+  if (process.env["NULLCODE_LLM"] === "ollama") {
     const base = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
-    const model = process.env["NPM_CLEANUP_MODEL"] ?? "qwen2.5-coder:7b";
+    const model = process.env["NULLCODE_MODEL"] ?? "qwen2.5-coder:7b";
     return {
       name: "ollama",
       model,
@@ -130,6 +132,34 @@ export function resolveProvider(): LLMProvider | null {
           },
           {},
           DEFAULT_TIMEOUT_MS + 60_000,
+        );
+        return extractText(data);
+      },
+    };
+  }
+
+  // Auto-detect a local Ollama install with a coding model — no config needed.
+  const local = detectOllama();
+  if (local.installed && local.model) {
+    const base = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
+    return {
+      name: "ollama",
+      model: local.model,
+      async complete(system, user, jsonMode) {
+        const data = await postJson(
+          `${base.replace(/\/$/, "")}/api/chat`,
+          {
+            model: local.model,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: user },
+            ],
+            stream: false,
+            ...(jsonMode ? { format: "json" } : {}),
+            options: { temperature: 0 },
+          },
+          {},
+          DEFAULT_TIMEOUT_MS + 120_000,
         );
         return extractText(data);
       },

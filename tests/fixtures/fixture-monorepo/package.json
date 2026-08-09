@@ -1,0 +1,17 @@
+{
+  "name": "fixture-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc -p packages/a"
+  },
+  "dependencies": {
+    "clipboard": "^2.0.11"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

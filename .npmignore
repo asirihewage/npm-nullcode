@@ -4,8 +4,8 @@ src/
 coverage/
 *.tsbuildinfo
 .eslintcache
-.npm-cleanup/
-.npm-cleanup-cache/
+.nullcode/
+.nullcode-cache/
 vitest.config.ts
 eslint.config.mjs
 tsconfig.json

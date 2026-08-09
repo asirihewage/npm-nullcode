@@ -2,6 +2,7 @@ import type { AnalyzerContext } from "../analyzer/index.js";
 import type { Candidate, DeepSeekEvidencePayload } from "../types/index.js";
 import { redactSecrets } from "../utils/redact.js";
 import { resolveProvider, type LLMProvider } from "./llm.js";
+import { ollamaSetupHint } from "./ollama.js";
 
 const BATCH_SIZE = 20;
 
@@ -26,8 +27,8 @@ Reason through each of these questions:
 10. What single piece of evidence most supports the "safe to remove" conclusion?
 
 Rules:
-- Return JSON only: {"assessments":[{"key":"<candidate key>","adjustment":<int -25..10>,"reasoning":"<1-3 sentences>","verdict":"SAFE|RISKY|UNCERTAIN"}]}
-- adjustment is added to the static confidence. Use NEGATIVE adjustments when you identify a plausible usage path the static engine could not see (down to -25). Use positive adjustments (max +10) ONLY when the evidence is exhaustive and you find no risk path.
+- Return JSON only: {"assessments":[{"key":"<candidate key>","adjustment":<int -25..9>,"reasoning":"<1-3 sentences>","verdict":"SAFE|RISKY|UNCERTAIN"}]}
+- adjustment is added to the static confidence. Use NEGATIVE adjustments when you identify a plausible usage path the static engine could not see (down to -25). Use positive adjustments (max +9) ONLY when the evidence is exhaustive and you find no risk path.
 - When in doubt, prefer a negative or zero adjustment.
 - Do not invent evidence. Base every statement on the provided fields.
 - Never mention secrets; none are provided.`;
@@ -90,7 +91,7 @@ export async function aiOptimizeCandidates(
   }
   const provider: LLMProvider | null = resolveProvider();
   if (!provider) {
-    return { used: false, errors: ["No LLM provider configured (set DEEPSEEK_API_KEY or OPENAI_API_KEY)."] };
+    return { used: false, errors: ["No LLM provider configured.\n" + ollamaSetupHint()] };
   }
 
   const errors: string[] = [];
@@ -156,7 +157,7 @@ function parseAssessments(raw: string): Assessment[] {
 export function applyAiAdjustment(candidate: Candidate): void {
   const adj = candidate.ai?.adjustment ?? 0;
   if (adj === 0) return;
-  const clamped = Math.max(-25, Math.min(10, adj));
+  const clamped = Math.max(-25, Math.min(9, adj));
   const total =
     candidate.scoreParts.reduce((sum, p) => sum + p.points, 0) + clamped;
   candidate.confidence = Math.max(1, Math.min(99, Math.round(total)));

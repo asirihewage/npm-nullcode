@@ -1,5 +1,6 @@
 import type { AliasMap, FrameworkAdapter, FrameworkContext } from "../types/index.js";
-import { fileExists, pathExists } from "../utils/fs.js";
+import { fileExists } from "../utils/fs.js";
+import * as path from "node:path";
 
 export abstract class BaseAdapter implements FrameworkAdapter {
   abstract readonly name: FrameworkAdapter["name"];
@@ -26,7 +27,7 @@ export function hasDep(ctx: FrameworkContext, name: string): boolean {
 }
 
 export function absPath(ctx: FrameworkContext, rel: string): string | null {
-  const p = rel.startsWith("/") ? ctx.rootDir + rel : `${ctx.rootDir}/${rel}`;
+  const p = path.resolve(ctx.rootDir, rel.replace(/^\//, ""));
   return fileExists(p) ? p : null;
 }
 

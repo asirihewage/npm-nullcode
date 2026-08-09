@@ -1,4 +1,4 @@
-import type { AliasMap, FrameworkAdapter, FrameworkContext } from "../types/index.js";
+import type { AliasMap, FrameworkContext } from "../types/index.js";
 import { absPath, BaseAdapter, fileAtRoot, hasDep } from "./adapter.js";
 
 export class ReactAdapter extends BaseAdapter {
@@ -6,8 +6,10 @@ export class ReactAdapter extends BaseAdapter {
 
   override detect(ctx: FrameworkContext): number {
     let score = 0;
-    if (hasDep(ctx, "react") || hasDep(ctx, "react-dom")) score += 30;
-    if (ctx.allFiles.some((f) => /\.(tsx|jsx)$/.test(f))) score += 15;
+    if (hasDep(ctx, "react") || hasDep(ctx, "react-dom")) {
+      score += 30;
+      if (ctx.allFiles.some((f) => /\.(tsx|jsx)$/.test(f))) score += 15;
+    }
     return score;
   }
 

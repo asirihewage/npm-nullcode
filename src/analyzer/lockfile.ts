@@ -72,7 +72,7 @@ export function analyzeLockfile(root: string): LockInfo {
     const names = new Map<string, string[]>();
     try {
       const text = fs.readFileSync(yarnLock, "utf8");
-      const re = /^  ("?@?[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+"?)@[^:]+:$/gm;
+      const re = /^ {2}("?@?[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+"?)@[^:]+:$/gm;
       let m: RegExpExecArray | null;
       while ((m = re.exec(text)) !== null) {
         const name = (m[1] ?? "").replace(/^"|"$/g, "");

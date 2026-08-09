@@ -24,7 +24,6 @@ const SOURCE_EXTS = new Set([
 
 const CSS_EXTS = new Set([".css", ".scss", ".sass", ".less"]);
 const HTML_EXTS = new Set([".html", ".htm"]);
-const ENV_EXTS = new Set([".env"]);
 
 const GENERATED_MARKERS = [
   "@generated",

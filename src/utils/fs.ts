@@ -70,7 +70,7 @@ export function walkFiles(root: string, opts: WalkOptions): string[] {
         visit(abs, rel);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (allSet.has(ext) || allSet.has(entry.name)) {
+        if (allSet.has(ext) || allSet.has(entry.name) || entry.name.startsWith(".env.")) {
           out.push(rel);
         }
       }

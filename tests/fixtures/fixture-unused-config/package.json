@@ -1,0 +1,12 @@
+{
+  "name": "fixture-unused-config",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production"
+  },
+  "devDependencies": {
+    "webpack": "^5.90.0",
+    "eslint": "^9.0.0"
+  }
+}

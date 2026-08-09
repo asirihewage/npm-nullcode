@@ -23,6 +23,17 @@ export function isTestUtility(rel: string): boolean {
   return TEST_UTIL_RE.test(rel) || /\btest(ing)?-[a-z-]+\.(ts|tsx|js|jsx)$/.test(path.basename(rel));
 }
 
+/**
+ * A file that lives in a test directory (so the runner won't execute it) but
+ * is not itself a conventional test file and imports nothing — an orphaned
+ * helper. Broader than isTestUtility (catches e.g. tests/legacyThing.ts).
+ */
+export function isTestOrphan(rel: string): boolean {
+  const base = path.basename(rel);
+  if (TEST_BASENAME_RE.test(base)) return false;
+  return TEST_DIR_RE.test(rel);
+}
+
 export function classifyTests(
   files: Array<{ abs: string; rel: string }>,
 ): TestPatterns {
@@ -62,7 +73,7 @@ function globToRegExp(pattern: string): RegExp {
   let i = 0;
   const chars = pattern.split("");
   while (i < chars.length) {
-    const c = chars[i];
+    const c = chars[i]!;
     if (c === "*") {
       if (chars[i + 1] === "*") {
         if (chars[i + 2] === "/") {

@@ -1,0 +1,1 @@
+export function unused() { return 2; }

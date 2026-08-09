@@ -1,0 +1,9 @@
+{
+  "name": "dup-a",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {},
+  "dependencies": {
+    "lodash": "^3.10.1"
+  }
+}

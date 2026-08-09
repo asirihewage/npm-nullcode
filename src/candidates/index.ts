@@ -6,7 +6,6 @@ import type {
   DuplicateInfo,
   DynamicRisk,
   ScorePart,
-  WorkspaceInfo,
 } from "../types/index.js";
 import { relPosix } from "../utils/fs.js";
 import { collectGitEvidence, gitPackageHistory } from "../analyzer/git.js";
@@ -16,9 +15,7 @@ import { findStringReferences } from "./string-refs.js";
 import {
   computeDependencyUsage,
   globRisk,
-  hardImportersOf,
   isEntryOrVirtual,
-  isGenerated,
   isInsideVirtualDir,
   isReferencedPath,
   isTestPath,
@@ -26,7 +23,7 @@ import {
   summaryOf,
 } from "./detector.js";
 import { envLoaderInstalled, PLATFORM_INJECTED, CLOUD_PLATFORM_PREFIXES } from "../analyzer/env.js";
-import { isTestUtility } from "../analyzer/tests.js";
+import { isTestUtility, isTestOrphan } from "../analyzer/tests.js";
 
 export interface DetectOptions {
   onProgress?: (stage: string, message?: string) => void;
@@ -38,8 +35,6 @@ export interface DetectResult {
   warnings: string[];
   infoMessages: string[];
 }
-
-const WEAK_EXTENSIONS = new Set([".d.ts", ".md", ".json"]);
 
 function mkId(type: string, key: string): string {
   return `${type}:${shortHash(key)}`;
@@ -115,24 +110,24 @@ export async function detectCandidates(
   const deadFiles = new Set<string>();
 
   for (const file of ctx.files) {
-    if (file.kind !== "source" && file.kind !== "css" && file.kind !== "test") continue;
+    if (file.kind !== "source" && file.kind !== "css") continue;
     if (file.generated) continue;
     if (file.ext === ".d.ts") continue;
     if (/\/?(generated|codegen|\.gen|\.cache)\//.test(file.rel)) continue;
     if (isEntryOrVirtual(ctx, file.abs)) continue;
     if (isInsideVirtualDir(ctx, file.abs)) continue;
-    if (isTestPath(ctx, file.abs) && file.kind !== "test") continue;
     if (reachableFromEntries.has(file.abs)) continue;
 
-    const importers = hardImportersOf(ctx, file.abs);
     const dynamicImporters = ctx.graph.files.get(file.abs)?.dynamicImporters ?? new Set<string>();
     const isReferenced = isReferencedPath(ctx, file.abs);
 
-    // CSS: only flag unimported css that is also not matched by globs.
+    // CSS: only flag unimported css that is also not matched by globs or
+    // referenced from configs (html, tailwind content, angular styles).
     if (file.kind === "css") {
       if (isReferenced) continue;
       const node = ctx.graph.files.get(file.abs);
       if (node && node.matchGlob.size > 0) continue;
+      if (configUsageOf(ctx, file.abs).length > 0) continue;
       const strings = await findStringReferences(ctx, file.abs);
       const positives: ScorePart[] = [
         { label: "No imports anywhere in the project", points: 35 },
@@ -175,13 +170,7 @@ export async function detectCandidates(
       continue;
     }
 
-    if (file.kind === "test") {
-      // Test files are auto-discovered by runners; only standalone test
-      // utilities with zero references are candidates.
-      if (isReferenced) continue;
-      if (!isTestUtility(file.rel)) continue;
-      if (file.rel.includes("__mocks__")) continue;
-    } else if (isReferenced) {
+    if (isReferenced) {
       continue;
     }
 
@@ -195,7 +184,6 @@ export async function detectCandidates(
     const globRiskCount = globRisk(ctx, file.abs);
     const dynamicImportersArr = [...dynamicImporters];
     const git = await collectGitEvidence(ctx.git, ctx.root, file.rel);
-    const monthsAgo = git?.monthsSinceLastChange ?? null;
 
     const positives: ScorePart[] = [
       { label: "No imports found anywhere in the project", points: 40 },
@@ -222,13 +210,13 @@ export async function detectCandidates(
     if (dynamicImportersArr.length > 0) {
       negatives.push({ label: "Loaded via dynamic import()", points: -20 });
     }
-    if (git && git.monthsSinceLastChange !== null && git.monthsSinceLastChange >= 12) {
+    if (git && git.monthsSinceLastChange != null && git.monthsSinceLastChange >= 12) {
       positives.push({
         label: `Not modified in ${Math.round(git.monthsSinceLastChange)} months (git)`,
         points: 8,
       });
     }
-    if (git && git.monthsSinceLastChange !== null && git.monthsSinceLastChange < 3) {
+    if (git && git.monthsSinceLastChange != null && git.monthsSinceLastChange < 3) {
       negatives.push({ label: "Modified recently (git)", points: -8 });
     }
     if (testRefs.length === 0) {
@@ -309,6 +297,20 @@ export async function detectCandidates(
           ...usage.dynamicFiles,
         ];
 
+        // Workspace packages exist to be consumed by sibling packages:
+        // any cross-package usage counts as real usage, even when the
+        // importer is itself otherwise dead.
+        const isWorkspacePkg = ctx.workspaces.some((w) => w.name === name);
+        if (isWorkspacePkg && allUsage.length > 0) {
+          continue;
+        }
+
+        // Dynamic import() of a package is real, runtime usage — the module
+        // loads it lazily regardless of the importing file's own reachability.
+        if (usage.dynamicFiles.length > 0) {
+          continue;
+        }
+
         if (allUsage.length === 0 && usage.scriptNames.length === 0 && usage.configFiles.length === 0) {
           // ----- completely unused -----
           const dockerNpx = dockerOrCiNpx(ctx, name);
@@ -382,7 +384,7 @@ export async function detectCandidates(
             { label: "0 config references", points: 5 },
           ];
           const negatives: ScorePart[] = [];
-          if (gitHist && gitHist.monthsSinceLastChange !== null && gitHist.monthsSinceLastChange >= 12) {
+          if (gitHist && gitHist.monthsSinceLastChange != null && gitHist.monthsSinceLastChange >= 12) {
             positives.push({
               label: `Declared ${Math.round(gitHist.monthsSinceLastChange)} months ago (git)`,
               points: 5,
@@ -425,10 +427,7 @@ export async function detectCandidates(
           continue;
         }
 
-        // referenced — informational only in the JSON (not a candidate)
-        if (usage.dynamicFiles.length > 0 && usage.importFiles.length === 0 && usage.requireFiles.length === 0) {
-          // dynamic-only usage: real usage, keep quiet.
-        }
+        // referenced — no candidate (kept)
       }
     }
   }
@@ -465,7 +464,6 @@ export async function detectCandidates(
 
   for (const [fileAbs, node] of ctx.graph.files) {
     if (node.importedBy.size === 0 && node.hardImportedBy.size === 0) continue;
-    if ([...node.hardImportedBy].some((f) => ctx.entries.has(f))) continue;
     if (isEntryOrVirtual(ctx, fileAbs)) continue;
     if (isLibraryWorkspace(ctx, fileAbs)) continue;
     if (summaryOf(ctx, fileAbs) === undefined) continue;
@@ -482,7 +480,7 @@ export async function detectCandidates(
         { label: "Module has direct importers (file is alive)", points: 10 },
       ];
       const negatives: ScorePart[] = [];
-      if (git && git.monthsSinceLastChange !== null && git.monthsSinceLastChange >= 12) {
+      if (git && git.monthsSinceLastChange != null && git.monthsSinceLastChange >= 12) {
         positives.push({
           label: `Not modified in ${Math.round(git.monthsSinceLastChange)} months (git)`,
           points: 5,
@@ -634,16 +632,16 @@ export async function detectCandidates(
       }
     }
 
-    // referenced but never defined — informational
+    // referenced but never defined — informational (source-file usage only)
     for (const [key, files] of ctx.envUsage) {
       if (ctx.envDefs.some((d) => d.key === key)) continue;
       if (PLATFORM_INJECTED.has(key)) continue;
       if (CLOUD_PLATFORM_PREFIXES.some((p) => key.startsWith(p))) continue;
       if (ciDockerKeys.has(key)) continue;
-      if (/^script:/.test([...files][0] ?? "")) continue;
-      if (files.size === 1 && [...files][0]?.includes("script:")) continue;
+      const sourceFiles = [...files].filter((f) => !f.startsWith("script:"));
+      if (sourceFiles.length === 0) continue;
       infoMessages.push(
-        `INFO env: ${key} is referenced (${files.size} location${files.size === 1 ? "" : "s"}) but never defined in .env* — likely provided at runtime.`,
+        `INFO env: ${key} is referenced (${sourceFiles.length} location${sourceFiles.length === 1 ? "" : "s"}) but never defined in .env* — likely provided at runtime.`,
       );
     }
   }
@@ -721,7 +719,7 @@ export async function detectCandidates(
         confidence,
         category: categoryFor(confidence),
         recommendation:
-          "This legacy config coexists with a modern flat config. npm-cleanup only flags this when the modern format is active.",
+          "This legacy config coexists with a modern flat config. nullcode only flags this when the modern format is active.",
         action: { kind: "delete" },
         evidence: {
           type: "config_file",
@@ -747,7 +745,7 @@ export async function detectCandidates(
 
   for (const file of ctx.files) {
     if (file.kind !== "test") continue;
-    if (!isTestUtility(file.rel)) continue;
+    if (!isTestUtility(file.rel) && !isTestOrphan(file.rel)) continue;
     if (isReferencedPath(ctx, file.abs)) continue;
     if (file.generated) continue;
     if (isEntryOrVirtual(ctx, file.abs)) continue;

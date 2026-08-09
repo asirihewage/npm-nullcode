@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { AstSummary, ExportRef, ImportRef } from "../../types/index.js";
+import type { AstSummary } from "../../types/index.js";
 
 const SCRIPT_KIND: Record<string, ts.ScriptKind> = {
   ".ts": ts.ScriptKind.TS,
@@ -35,6 +35,14 @@ function isExportIdentifier(
   );
 }
 
+function isImportMeta(node: ts.Node): node is ts.MetaProperty {
+  return (
+    ts.isMetaProperty(node) &&
+    node.name.text === "meta" &&
+    node.getFirstToken()?.kind === ts.SyntaxKind.ImportKeyword
+  );
+}
+
 function collectNamedFromClause(
   clause: ts.NamedExportBindings | ts.NamedImports | ts.NamedExports | undefined,
   out: string[],
@@ -46,6 +54,22 @@ function collectNamedFromClause(
   }
   for (const el of clause.elements) {
     out.push(el.name.text);
+  }
+}
+
+function exportElements(
+  clause: ts.NamedExports,
+  summary: AstSummary,
+  isTypeOnly: boolean,
+  sourceFile: ts.SourceFile,
+): void {
+  for (const el of clause.elements) {
+    summary.exports.push({
+      name: el.name.text,
+      line: lineOf(sourceFile, el),
+      kind: isTypeOnly ? "type" : "value",
+      isDefault: false,
+    });
   }
 }
 
@@ -67,20 +91,33 @@ export function analyzeAst(filePath: string, text: string): AstSummary {
   };
   if (!sourceFile) return summary;
   if (text.indexOf("@jsxRuntime") !== -1) summary.hasJsxRuntimeUse = true;
-
-  const processEnvAccesses: ts.PropertyAccessExpression[] = [];
+  // A file with parse errors yields unreliable exports; stay tolerant and
+  // record nothing structural (imports/env are collected below only for
+  // syntactically valid files as well, to avoid flagging broken ones).
+  const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] }).parseDiagnostics;
+  if (parseDiagnostics.length > 0) return summary;
 
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node)) {
       const spec = node.moduleSpecifier;
       if (ts.isStringLiteral(spec)) {
         const requested: string[] = [];
-        collectNamedFromClause(node.importClause?.namedBindings, requested);
+        const namedBindings = node.importClause?.namedBindings;
+        if (namedBindings && ts.isNamedImports(namedBindings)) {
+          collectNamedFromClause(namedBindings, requested);
+        } else if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+          requested.push("*");
+        }
         if (node.importClause?.name) requested.push("default");
-        const typeOnly = node.importClause?.isTypeOnly === true;
+        let typeOnly = node.importClause?.isTypeOnly === true;
         if (node.importClause?.name && typeOnly) {
           requested.length = 0;
           requested.push("default");
+        }
+        if (!typeOnly && namedBindings && ts.isNamedImports(namedBindings)) {
+          for (const el of namedBindings.elements) {
+            if (el.isTypeOnly) typeOnly = true;
+          }
         }
         summary.imports.push({
           specifier: spec.text,
@@ -96,25 +133,11 @@ export function analyzeAst(filePath: string, text: string): AstSummary {
     if (ts.isExportDeclaration(node)) {
       if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
         summary.reexports.push(node.moduleSpecifier.text);
-        if (node.exportClause) {
-          for (const el of node.exportClause.elements) {
-            summary.exports.push({
-              name: el.name.text,
-              line: lineOf(sourceFile, el),
-              kind: "value",
-              isDefault: false,
-            });
-          }
+        if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+          exportElements(node.exportClause, summary, node.isTypeOnly, sourceFile);
         }
-      } else if (node.exportClause) {
-        for (const el of node.exportClause.elements) {
-          summary.exports.push({
-            name: el.name.text,
-            line: lineOf(sourceFile, el),
-            kind: node.isTypeOnly ? "type" : "value",
-            isDefault: false,
-          });
-        }
+      } else if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+        exportElements(node.exportClause, summary, node.isTypeOnly, sourceFile);
       }
       return;
     }
@@ -233,8 +256,7 @@ export function analyzeAst(filePath: string, text: string): AstSummary {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      ts.isPropertyAccessExpression(node.expression.expression) &&
-      node.expression.expression.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      isImportMeta(node.expression.expression) &&
       ["glob", "globEager", "globSync"].includes(node.expression.name.text)
     ) {
       const arg = node.arguments[0];
@@ -291,9 +313,9 @@ export function analyzeAst(filePath: string, text: string): AstSummary {
       const base = node.expression.expression;
       if (
         (ts.isIdentifier(base) && base.text === "process") ||
-        base.kind === ts.SyntaxKind.ImportKeyword
+        isImportMeta(base)
       ) {
-        processEnvAccesses.push(node);
+        summary.env.push({ key: node.name.text, line: lineOf(sourceFile, node) });
         return;
       }
     }
@@ -331,13 +353,6 @@ export function analyzeAst(filePath: string, text: string): AstSummary {
     ts.forEachChild(node, walk);
   });
 
-  for (const access of processEnvAccesses) {
-    summary.env.push({
-      key: access.name.text,
-      line: lineOf(sourceFile, access),
-    });
-  }
-
   return summary;
 }
 
@@ -371,7 +386,7 @@ export function analyzeRegexFallback(filePath: string, text: string): AstSummary
         for (const part of clause.split(",")) {
           const t = part.trim();
           if (!t) continue;
-          if (/(^|\s)as\s/ || t.startsWith("{")) {
+          if (/(^|\s)as\s/.test(t) || t.startsWith("{")) {
             const inner = t.includes("{") ? t.slice(t.indexOf("{") + 1, t.lastIndexOf("}")) : t;
             for (const n of inner.split(",").map((s) => s.trim()).filter(Boolean)) {
               if (n.includes(" as ")) requested.push(n.split(" as ")[1]!.trim());

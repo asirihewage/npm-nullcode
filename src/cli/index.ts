@@ -4,8 +4,8 @@ import { runCli } from "./run.js";
 export async function main(argv: string[]): Promise<number> {
   const program = new Command();
   program
-    .name("npm-cleanup")
-    .description("Find what you can safely remove from your JavaScript/TypeScript project.")
+    .name("nullcode")
+    .description("Find what you can safely remove from your JavaScript/TypeScript project — with local AI verification via Ollama.")
     .version("0.1.0", "-v, --version", "output the version number");
 
   program
@@ -46,7 +46,7 @@ export async function main(argv: string[]): Promise<number> {
   sub("explain <item>", "show detailed reasoning for a candidate").action(async (item: string) => {
     process.exitCode = await runCli({ tool: "explain", item, argv });
   });
-  sub("init", "write a .npm-cleanupignore template").action(async () => {
+  sub("init", "write a .nullcodeignore template").action(async () => {
     process.exitCode = await runCli({ tool: "init", argv });
   });
 
@@ -61,10 +61,10 @@ export async function main(argv: string[]): Promise<number> {
     const e = err as { code?: string; message?: string };
     if (e.code === "commander.helpDisplayed") return 0;
     if (e.code === "commander.version") return 0;
-    process.stderr.write(`npm-cleanup: ${e.message ?? String(err)}\n`);
+    process.stderr.write(`nullcode: ${e.message ?? String(err)}\n`);
     return 2;
   }
-  return process.exitCode ?? 0;
+  return typeof process.exitCode === "number" ? process.exitCode : 0;
 }
 
 if (process.argv[1] && /cli[/\\]index\.(js|ts)$/.test(process.argv[1])) {

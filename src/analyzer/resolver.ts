@@ -46,7 +46,7 @@ export function stripQuery(spec: string): string {
   return q === -1 ? spec : spec.slice(0, q);
 }
 
-function tryResolveFile(abs: string, root: string): string | null {
+function tryResolveFile(abs: string, _root: string): string | null {
   if (fileExists(abs)) return path.resolve(abs);
   if (pathExists(abs) ) {
     // directory: index resolution
@@ -91,6 +91,31 @@ function dirExistsLike(p: string): boolean {
   }
 }
 
+/** Resolve the importable entry of a workspace package: `main`/`module` from
+ * its package.json, then conventional src/index entries. */
+function resolveWorkspaceEntry(dir: string): string | null {
+  const pkgPath = path.join(dir, "package.json");
+  if (fileExists(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
+      for (const field of ["main", "module", "types"] as const) {
+        const value = pkg[field];
+        if (typeof value === "string" && value.length > 0) {
+          const resolved = tryResolveFile(path.resolve(dir, value), dir);
+          if (resolved) return resolved;
+        }
+      }
+    } catch {
+      // fall through to conventional entries
+    }
+  }
+  for (const candidate of ["src/index.ts", "src/index.tsx", "src/index.js", "index.ts", "index.js"]) {
+    const abs = path.join(dir, candidate);
+    if (fileExists(abs)) return path.resolve(abs);
+  }
+  return null;
+}
+
 export function resolveImport(
   specRaw: string,
   importerAbs: string,
@@ -111,9 +136,10 @@ export function resolveImport(
     spec.startsWith(".") ||
     spec.startsWith("/") ||
     spec.startsWith("#") ||
-    (spec.startsWith("@") && false)
+    spec.startsWith("@")
   ) {
-    // Alias maps first (they may shadow relative-looking specs)
+    // Alias maps first (they may shadow relative-looking specs, including
+    // tsconfig paths like "@/*" which start with "@").
     for (const alias of ctx.aliasMaps) {
       const target = matchAlias(spec, alias);
       if (target) {
@@ -136,6 +162,10 @@ export function resolveImport(
 
     if (spec.startsWith("#")) {
       result = { kind: "unresolved", specifier: specRaw };
+    } else if (spec.startsWith("@")) {
+      // Pseudo-scoped specifier that matched no alias: fall back to
+      // workspace/package resolution (monorepo imports).
+      result = resolveBareSpecifier(spec, ctx);
     } else {
       const base = spec.startsWith("/")
         ? path.join(ctx.root, spec.slice(1))
@@ -148,19 +178,27 @@ export function resolveImport(
       }
     }
   } else {
-    // Bare specifier: workspace package? then a package name.
-    const workspaceDir = ctx.workspaceNames.get(spec);
-    if (workspaceDir) {
-      result = { kind: "package", packageName: spec, specifier: specRaw };
-    } else {
-      const parts = spec.startsWith("@") ? spec.split("/").slice(0, 2) : [spec.split("/")[0]!];
-      const pkgName = parts.join("/");
-      result = { kind: "package", packageName: pkgName, specifier: specRaw };
-    }
+    result = resolveBareSpecifier(spec, ctx);
   }
 
   ctx.memo.set(memoKey, result);
   return result;
+}
+
+function resolveBareSpecifier(spec: string, ctx: ResolverContext): ResolvedImport {
+  // Bare specifier: workspace package? resolve its entry file so the graph
+  // gets real edges. Otherwise it is a plain package name.
+  const workspaceDir = ctx.workspaceNames.get(spec);
+  if (workspaceDir) {
+    const entry = resolveWorkspaceEntry(workspaceDir);
+    if (entry) {
+      return { kind: "file", filePath: entry, packageName: spec, specifier: spec };
+    }
+    return { kind: "package", packageName: spec, specifier: spec };
+  }
+  const parts = spec.startsWith("@") ? spec.split("/").slice(0, 2) : [spec.split("/")[0]!];
+  const pkgName = parts.join("/");
+  return { kind: "package", packageName: pkgName, specifier: spec };
 }
 
 /* ------------------------------------------------------------------ */
@@ -208,7 +246,6 @@ export function aliasesFromBundlerConfig(configPath: string, root: string): Alia
     return out;
   }
 
-  const isTs = /\.(ts|mts|cts|tsx)$/.test(configPath);
   const sourceFile = ts.createSourceFile(configPath, text, ts.ScriptTarget.Latest, true);
   const visit = (node: ts.Node): void => {
     if (ts.isPropertyAssignment(node) && node.name.getText(sourceFile) === "alias") {
@@ -224,6 +261,32 @@ export function aliasesFromBundlerConfig(configPath: string, root: string): Alia
           const val = prop.initializer;
           if (ts.isStringLiteral(val)) {
             out.push({ from: key, to: toAbsolute(root, val.text), hasStar: key.includes("*") });
+          } else if (ts.isCallExpression(val)) {
+            // path.resolve(__dirname, "src") style targets
+            const fn = val.expression.getText(sourceFile);
+            if (!/(^|[.])resolve$|(^|[.])join$/.test(fn)) continue;
+            const parts: string[] = [];
+            let ok = true;
+            for (const arg of val.arguments) {
+              if (ts.isStringLiteral(arg)) {
+                parts.push(arg.text);
+              } else if (ts.isTemplateExpression(arg)) {
+                const tp = templateLiteralParts(arg, sourceFile);
+                if (!tp) {
+                  ok = false;
+                  break;
+                }
+                parts.push(...tp);
+              } else if (arg.getText(sourceFile) === "__dirname") {
+                // __dirname anchors the path at the project root
+              } else {
+                ok = false;
+                break;
+              }
+            }
+            if (ok && parts.length > 0) {
+              out.push({ from: key, to: path.resolve(root, ...parts), hasStar: key.includes("*") });
+            }
           } else if (ts.isObjectLiteralExpression(val)) {
             let find: string | undefined;
             let replacement: string | undefined;
@@ -265,6 +328,19 @@ export function aliasesFromBundlerConfig(configPath: string, root: string): Alia
     while ((p = pairRe.exec(body)) !== null) {
       out.push({ from: p[1]!, to: toAbsolute(root, p[2]!), hasStar: p[1]!.includes("*") });
     }
+  }
+  return out;
+}
+
+function templateLiteralParts(
+  t: ts.TemplateExpression,
+  sourceFile: ts.SourceFile,
+): string[] | null {
+  const out: string[] = [];
+  if (t.head.text.length > 0) out.push(t.head.text);
+  for (const span of t.templateSpans) {
+    if (span.expression.getText(sourceFile) !== "__dirname") return null;
+    if (span.literal.text.length > 0) out.push(span.literal.text);
   }
   return out;
 }
@@ -360,7 +436,7 @@ export function globToRegExp(pattern: string): RegExp {
   let i = 0;
   const chars = pattern.split("");
   while (i < chars.length) {
-    const c = chars[i];
+    const c = chars[i]!;
     if (c === "*") {
       if (chars[i + 1] === "*") {
         if (chars[i + 2] === "/") {

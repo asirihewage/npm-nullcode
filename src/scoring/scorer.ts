@@ -6,7 +6,9 @@ export interface ScoringInput {
   positives: ScorePart[];
   /** negative evidence (risk factors) */
   negatives: ScorePart[];
-  /** AI adjustment in [-25, +10] */
+  /** AI adjustment in [-25, +9]. Positive boosts are deliberately capped
+   * tighter than negative penalties: AI may raise trust a little, but its
+   * strongest signal is finding usage paths the static engine missed. */
   aiAdjustment?: number;
 }
 
@@ -32,7 +34,7 @@ export function scoreConfidence(input: ScoringInput): {
   parts.push(...negatives.map((n) => ({ label: n.label, points: n.points })));
 
   if (input.aiAdjustment !== undefined && input.aiAdjustment !== 0) {
-    const clamped = clamp(input.aiAdjustment, -25, 10);
+    const clamped = clamp(input.aiAdjustment, -25, 9);
     total += clamped;
     parts.push({ label: "AI assessment", points: clamped });
   }

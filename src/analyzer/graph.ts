@@ -77,6 +77,14 @@ export function buildImportGraph(
           }
         }
         target.importedBy.add(fileAbs);
+        if (resolved.packageName) {
+          let usages = packageUsage.get(resolved.packageName);
+          if (!usages) {
+            usages = new Set();
+            packageUsage.set(resolved.packageName, usages);
+          }
+          usages.add(fileAbs);
+        }
       } else if (resolved.kind === "package" && resolved.packageName) {
         node.packages.add(resolved.packageName);
         let usages = packageUsage.get(resolved.packageName);
@@ -94,6 +102,14 @@ export function buildImportGraph(
         target.namespaceImporters.add(fileAbs);
         target.importedBy.add(fileAbs);
         target.hardImportedBy.add(fileAbs);
+        if (resolved.packageName) {
+          let usages = packageUsage.get(resolved.packageName);
+          if (!usages) {
+            usages = new Set();
+            packageUsage.set(resolved.packageName, usages);
+          }
+          usages.add(fileAbs);
+        }
       } else if (resolved.kind === "package" && resolved.packageName) {
         let usages = packageUsage.get(resolved.packageName);
         if (!usages) {
@@ -106,9 +122,18 @@ export function buildImportGraph(
   }
 
   // Match glob patterns last so all files exist in the graph already.
+  // Glob patterns in Vite/Webpack (import.meta.glob, require.context) are
+  // relative to the importing file, so resolve them at build time.
   for (const [fileAbs, summary] of summariesByFile) {
     for (const pattern of summary.globPatterns) {
-      for (const matched of matchGlob(pattern, resolver.root, [...files.keys()])) {
+      const normalized = pattern.split("\\").join("/");
+      const resolvedPattern = normalized.startsWith(".")
+        ? path
+            .relative(resolver.root, path.join(path.dirname(fileAbs), normalized))
+            .split("\\")
+            .join("/")
+        : normalized;
+      for (const matched of matchGlob(resolvedPattern, resolver.root, [...files.keys()])) {
         const target = ensureFile(matched);
         target.matchGlob.add(fileAbs);
         target.importedBy.add(fileAbs);
@@ -136,7 +161,7 @@ function globToRegExp(pattern: string): RegExp {
   let i = 0;
   const chars = pattern.split("");
   while (i < chars.length) {
-    const c = chars[i];
+    const c = chars[i]!;
     if (c === "*") {
       if (chars[i + 1] === "*") {
         if (chars[i + 2] === "/") {

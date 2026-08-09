@@ -1,0 +1,12 @@
+{
+  "name": "fixture-webpack",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production"
+  },
+  "dependencies": {
+    "webpack": "^5.90.0",
+    "lodash": "^4.17.21"
+  }
+}

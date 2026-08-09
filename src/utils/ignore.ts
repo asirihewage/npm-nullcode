@@ -1,5 +1,5 @@
 /**
- * A gitignore-style pattern matcher used for `.npm-cleanupignore` files and the
+ * A gitignore-style pattern matcher used for `.nullcodeignore` files and the
  * `ignore` option. Supports the common gitignore semantics:
  *
  * - `#` comments, blank lines
@@ -19,10 +19,10 @@ function globToRegExp(pattern: string): RegExp {
   let i = 0;
   const chars = pattern.split("");
   while (i < chars.length) {
-    const c = chars[i];
+    const c = chars[i]!;
     if (c === "*") {
       if (chars[i + 1] === "*") {
-        let next = chars[i + 2];
+        const next = chars[i + 2];
         if (next === "/") {
           out += "(?:.*/)?";
           i += 3;
@@ -60,6 +60,8 @@ export interface CompiledPattern {
   dirOnly: boolean;
   baseOnly: boolean;
   negated: boolean;
+  /** For patterns ending in "/**": the subtree root to also match itself. */
+  tree: string | null;
 }
 
 export function compilePattern(line: string): CompiledPattern | null {
@@ -81,12 +83,17 @@ export function compilePattern(line: string): CompiledPattern | null {
     pattern = pattern.slice(1);
   }
   const hadSlash = pattern.includes("/");
-  const anchored = pattern.startsWith("/");
-  if (anchored) pattern = pattern.slice(1);
+  if (pattern.startsWith("/")) pattern = pattern.slice(1);
   // Patterns without a slash match against the basename at any depth.
-  let baseOnly = !hadSlash || anchored;
+  const baseOnly = !hadSlash;
+  // "dir/**" conventionally matches everything inside dir, and — since our
+  // walker prunes ignored directories — the directory itself.
+  let tree: string | null = null;
+  if (!baseOnly && pattern.endsWith("/**")) {
+    tree = pattern.slice(0, -3);
+  }
   const regex = globToRegExp(pattern);
-  return { regex, dirOnly, baseOnly, negated };
+  return { regex, dirOnly, baseOnly, negated, tree };
 }
 
 export function isIgnored(
@@ -94,17 +101,37 @@ export function isIgnored(
   relPath: string,
   isDir: boolean,
 ): boolean {
-  const normalized = relPath.split("\\").join("/");
+  const normalized = relPath.split("\\").join("/").replace(/\/+$/, "");
+  const segs = normalized.split("/");
   let ignored = false;
   for (const p of patterns) {
-    if (p.dirOnly && !isDir) continue;
-    let matched: boolean;
+    let primary = false;
     if (p.baseOnly) {
-      matched = p.regex.test(normalized.split("/").at(-1) ?? "");
+      primary = p.regex.test(segs.at(-1) ?? "");
+    } else if (p.tree) {
+      primary =
+        normalized === p.tree ||
+        normalized.startsWith(p.tree + "/") ||
+        p.regex.test(normalized);
     } else {
-      matched = p.regex.test(normalized);
+      primary = p.regex.test(normalized);
     }
-    if (matched) ignored = !p.negated;
+    if (primary && p.dirOnly && !isDir) primary = false;
+    // A pattern that matches a directory also excludes everything under it.
+    let subtree = false;
+    if (!primary) {
+      if (p.baseOnly) {
+        subtree = segs.slice(0, -1).some((seg) => p.regex.test(seg));
+      } else {
+        for (let i = 1; i < segs.length; i++) {
+          if (p.regex.test(segs.slice(0, i).join("/"))) {
+            subtree = true;
+            break;
+          }
+        }
+      }
+    }
+    if (primary || subtree) ignored = !p.negated;
   }
   return ignored;
 }
@@ -128,7 +155,7 @@ export function createIgnoreMatcher(lines: string[]): IgnoreMatcher {
 }
 
 /**
- * Merges a set of ignore sources with the defaults npm-cleanup always applies.
+ * Merges a set of ignore sources with the defaults nullcode always applies.
  */
 export function mergeIgnoreLines(extra: string[]): string[] {
   const defaults = [
@@ -144,8 +171,8 @@ export function mergeIgnoreLines(extra: string[]): string[] {
     ".turbo/**",
     ".yarn/**",
     ".pnpm-store/**",
-    ".npm-cleanup/**",
-    ".npm-cleanup-cache/**",
+    ".nullcode/**",
+    ".nullcode-cache/**",
     "out/**",
     "target/**",
     "*.min.js",

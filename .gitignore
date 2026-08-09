@@ -1,8 +1,8 @@
 node_modules/
 dist/
 coverage/
-.npm-cleanup/
-.npm-cleanup-cache/
+.nullcode/
+.nullcode-cache/
 *.log
 .DS_Store
 *.tsbuildinfo

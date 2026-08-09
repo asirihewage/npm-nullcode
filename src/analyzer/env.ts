@@ -1,5 +1,3 @@
-import type { EnvDefinition } from "../types/index.js";
-
 /** Parses a `.env` style file into key/value pairs. */
 export function parseEnvFile(text: string): Map<string, string> {
   const out = new Map<string, string>();
@@ -20,7 +18,7 @@ export function parseDockerEnv(text: string): string[] {
   const keys: string[] = [];
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
-    const m = /^ENV\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*.*)?$/.exec(line);
+    const m = /^ENV\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*[^\s]*|\s+\S+)*$/.exec(line);
     if (m) keys.push(m[1]!);
   }
   return keys;

@@ -13,7 +13,7 @@ export interface ApplyResult {
 }
 
 /**
- * Executes a cleanup plan. Files are MOVED into `.npm-cleanup/backup/<ts>/`
+ * Executes a cleanup plan. Files are MOVED into `.nullcode/backup/<ts>/`
  * (recoverable), dependencies are removed from package.json. package.json is
  * backed up first. Nothing is ever deleted permanently.
  */

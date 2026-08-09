@@ -3,6 +3,7 @@ import { analyzeProject } from "./analyzer/index.js";
 import { detectCandidates, type DetectResult } from "./candidates/index.js";
 import { aiOptimizeCandidates, applyAiAdjustment } from "./ai/reasoning.js";
 import { describeProvider } from "./ai/llm.js";
+import { ollamaSetupHint } from "./ai/ollama.js";
 import { formatNumber } from "./utils/format.js";
 import type { ScanResult } from "./types/index.js";
 
@@ -49,7 +50,8 @@ export async function runScan(opts: RunScanOptions = {}): Promise<RunScanResult>
       ? undefined
       : opts.ai === false
         ? "disabled via --no-ai"
-        : "no LLM provider configured (set DEEPSEEK_API_KEY, OPENAI_API_KEY or NPM_CLEANUP_LLM=ollama)",
+        : "no local AI available — install Ollama and pull a coding model (see README): " +
+          ollamaSetupHint(),
   };
 
   if (aiEnabled) {
@@ -93,7 +95,7 @@ export async function runScan(opts: RunScanOptions = {}): Promise<RunScanResult>
   );
 
   const result: ScanResult = {
-    tool: "npm-cleanup",
+    tool: "nullcode",
     version: TOOL_VERSION,
     rootDir: root,
     framework: ctx.framework,

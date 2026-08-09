@@ -33,7 +33,7 @@ export function renderCiReport(result: ScanResult, threshold: number): string {
       lines.push(`   category: ${c.category}`);
     });
     lines.push("");
-    lines.push("Run `npm cleanup --interactive` to review, or raise the threshold with --threshold.");
+    lines.push("Run `nullcode --interactive` to review, or raise the threshold with --threshold.");
     lines.push("");
     lines.push("Exit code: 1");
   } else {

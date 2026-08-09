@@ -1,0 +1,15 @@
+{
+  "name": "fixture-unused-dependency",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

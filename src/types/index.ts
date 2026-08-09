@@ -15,6 +15,7 @@ export type FrameworkName =
 export type CandidateType =
   | "dependency"
   | "devDependency"
+  | "optionalDependency"
   | "dependency_dead_only"
   | "duplicate_dependency"
   | "source_file"
@@ -44,7 +45,7 @@ export interface GitEvidence {
   available: boolean;
   lastCommit?: string;
   commitCount?: number;
-  monthsSinceLastChange?: number | null;
+  monthsSinceLastChange: number | null;
   removedFromHistory?: boolean;
 }
 
@@ -281,7 +282,7 @@ export interface DeepSeekEvidencePayload {
   exports: string[];
   string_references: string[];
   package_references: string[];
-  git: Record<string, string | number | null | undefined>;
+  git: Record<string, string | number | boolean | null | undefined>;
   framework: string;
   dynamic_import_risk: DynamicRisk;
   dead_only?: boolean;

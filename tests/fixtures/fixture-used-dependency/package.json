@@ -1,0 +1,10 @@
+{
+  "name": "fixture-used-dependency",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {},
+  "dependencies": {
+    "express": "^4.19.0",
+    "moment": "^2.30.0"
+  }
+}

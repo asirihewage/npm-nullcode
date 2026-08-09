@@ -1,0 +1,10 @@
+{
+  "name": "fixture-framework-entrypoint",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "cli": "node bin/cli.js"
+  },
+  "dependencies": {}
+}

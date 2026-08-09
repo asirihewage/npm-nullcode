@@ -1,4 +1,4 @@
-import type { Candidate, ConfidenceCategory, DuplicateInfo, ScanResult } from "../types/index.js";
+import type { Candidate, ConfidenceCategory, ScanResult } from "../types/index.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { CATEGORY_DESCRIPTIONS } from "../scoring/scorer.js";
 import { formatLines, formatNumber, monthsSince } from "../utils/format.js";
@@ -28,7 +28,7 @@ export function renderTerminalReport(result: ScanResult, opts: { verbose?: boole
   const logger = createLogger({ verbose: opts.verbose });
   const { candidates, stats } = result;
 
-  logger.banner("🧹 npm-cleanup");
+  logger.banner("🧹 nullcode");
   logger.raw("");
   logger.info(`Scanned: ${result.rootDir}`);
   logger.success(`${formatNumber(stats.files)} files analyzed`);
@@ -173,8 +173,8 @@ function renderSummary(logger: Logger, result: ScanResult): void {
   logger.raw(`    ${formatLines(totalLines)} estimated`);
   logger.raw("");
   logger.raw("  Run:");
-  logger.raw(`    npm cleanup --interactive   # review and remove file-by-file`);
-  logger.raw(`    npm cleanup --fix --yes     # remove only ≥90% confidence items`);
+  logger.raw(`    nullcode --interactive   # review and remove file-by-file`);
+  logger.raw(`    nullcode --fix --yes     # remove only ≥90% confidence items`);
   logger.raw("");
   logger.raw(line);
 }

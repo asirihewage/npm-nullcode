@@ -1,0 +1,9 @@
+{
+  "name": "fixture-dynamic-import",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {},
+  "dependencies": {
+    "moment": "^2.30.0"
+  }
+}
