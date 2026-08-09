@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440" role="img" aria-label="nullcode — find what you can safely remove, verified by a local AI model">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="760" height="440" rx="24" fill="url(#bg)"/>
+  <rect x="28" y="28" width="704" height="384" rx="16" fill="none" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- header -->
+  <rect x="48" y="44" width="44" height="44" rx="10" fill="url(#accent)"/>
+  <text x="70" y="72" font-family="monospace" font-size="26" font-weight="bold" fill="#0f172a" text-anchor="middle">n</text>
+  <text x="108" y="72" font-family="monospace" font-size="26" font-weight="bold" fill="#f8fafc">nullcode</text>
+  <text x="108" y="92" font-family="sans-serif" font-size="13" fill="#94a3b8">Find what you can safely remove from your JS/TS project</text>
+  <text x="712" y="70" font-family="sans-serif" font-size="11" fill="#22d3ee" text-anchor="end">local AI verification</text>
+  <text x="712" y="86" font-family="sans-serif" font-size="11" fill="#94a3b8" text-anchor="end">Ollama + qwen2.5-coder</text>
+
+  <!-- tiles -->
+  <g font-family="sans-serif">
+    <!-- 1 unused dependency -->
+    <rect x="48" y="120" width="330" height="96" rx="12" fill="url(#tile)" stroke="#334155" stroke-width="1"/>
+    <circle cx="80" cy="168" r="14" fill="#f472b6" opacity="0.18"/>
+    <text x="80" y="173" font-size="15" text-anchor="middle">×</text>
+    <text x="106" y="158" font-size="14" font-weight="600" fill="#f8fafc">Unused dependencies</text>
+    <text x="106" y="178" font-size="12" fill="#94a3b8">lodash: 0 imports, 0 scripts, 0 configs</text>
+    <text x="106" y="194" font-size="12" fill="#34d399">→ npm uninstall lodash  ·  axios kept</text>
+
+    <!-- 2 dead files -->
+    <rect x="394" y="120" width="318" height="96" rx="12" fill="url(#tile)" stroke="#334155" stroke-width="1"/>
+    <circle cx="426" cy="168" r="14" fill="#22d3ee" opacity="0.18"/>
+    <text x="426" y="173" font-size="15" text-anchor="middle">f</text>
+    <text x="452" y="158" font-size="14" font-weight="600" fill="#f8fafc">Dead source files</text>
+    <text x="452" y="178" font-size="12" fill="#94a3b8">src/util.js — imported by nobody</text>
+    <text x="452" y="194" font-size="12" fill="#34d399">→ moved to .nullcode/backup, restorable</text>
+
+    <!-- 3 env vars -->
+    <rect x="48" y="228" width="330" height="96" rx="12" fill="url(#tile)" stroke="#334155" stroke-width="1"/>
+    <circle cx="80" cy="276" r="14" fill="#a78bfa" opacity="0.18"/>
+    <text x="80" y="281" font-size="15" text-anchor="middle">v</text>
+    <text x="106" y="266" font-size="14" font-weight="600" fill="#f8fafc">Unused env vars</text>
+    <text x="106" y="286" font-size="12" fill="#94a3b8">DEBUG_MODE in .env, never referenced</text>
+    <text x="106" y="302" font-size="12" fill="#34d399">→ example-only keys flagged too (.env.example)</text>
+
+    <!-- 4 configs -->
+    <rect x="394" y="228" width="318" height="96" rx="12" fill="url(#tile)" stroke="#334155" stroke-width="1"/>
+    <circle cx="426" cy="276" r="14" fill="#fbbf24" opacity="0.18"/>
+    <text x="426" y="281" font-size="15" text-anchor="middle">c</text>
+    <text x="452" y="266" font-size="14" font-weight="600" fill="#f8fafc">Dead configs</text>
+    <text x="452" y="286" font-size="12" fill="#94a3b8">jest.config.js but jest is not installed</text>
+    <text x="452" y="302" font-size="12" fill="#34d399">→ live webpack.config.js always kept</text>
+  </g>
+
+  <!-- footer -->
+  <rect x="48" y="344" width="664" height="52" rx="12" fill="#0b1120" stroke="#334155" stroke-width="1"/>
+  <text x="72" y="368" font-family="sans-serif" font-size="12" font-weight="600" fill="#22d3ee">CONFIDENCE</text>
+  <text x="72" y="386" font-family="sans-serif" font-size="12" fill="#e2e8f0">≥90 SAFE_TO_REMOVE · 75–89 LIKELY_UNUSED · 60–74 REVIEW_REQUIRED</text>
+  <text x="688" y="372" font-family="sans-serif" font-size="12" fill="#94a3b8" text-anchor="end">works in: next · react · vite · webpack ·</text>
+  <text x="688" y="388" font-family="sans-serif" font-size="12" fill="#94a3b8" text-anchor="end">angular · vue · node · monorepos</text>
+</svg>

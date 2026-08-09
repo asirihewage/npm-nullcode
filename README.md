@@ -7,6 +7,8 @@ scores and an optional **local AI verification layer** powered by
 
 Everything runs locally: no source code or secrets ever leave your machine.
 
+![nullcode — find what you can safely remove, verified by a local AI model](docs/nullcode-showcase.svg)
+
 ## Install
 
 ```bash
