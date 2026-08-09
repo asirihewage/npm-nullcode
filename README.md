@@ -1,5 +1,9 @@
 # nullcode
 
+[![npm version](https://img.shields.io/npm/v/nullcode?color=22d3ee)](https://www.npmjs.com/package/nullcode)
+[![npm downloads](https://img.shields.io/npm/dm/nullcode?color=a78bfa)](https://www.npmjs.com/package/nullcode)
+[![License](https://img.shields.io/npm/l/nullcode?color=34d399)](https://github.com/asirihewage/npm-nullcode/blob/main/LICENSE)
+
 Finds code, dependencies, configuration files and environment variables in your
 JavaScript/TypeScript project that appear **safe to remove** — with confidence
 scores and an optional **local AI verification layer** powered by
